@@ -9,11 +9,11 @@ import android.os.Bundle
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var btnStream: Button
+    private lateinit var btnStop: Button // Novo botão
     private lateinit var etUrl: EditText
     private lateinit var etKey: EditText
     private lateinit var rb720: RadioButton
@@ -22,33 +22,33 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Pede permissões (Áudio e Notificação para Android 13+)
+        // Permissões
         val permissions = mutableListOf(Manifest.permission.RECORD_AUDIO)
         if (Build.VERSION.SDK_INT >= 33) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
         ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 1)
 
+        // Vincular componentes da tela
         etUrl = findViewById(R.id.etUrl)
         etKey = findViewById(R.id.etKey)
         btnStream = findViewById(R.id.btnStream)
+        btnStop = findViewById(R.id.btnStop)
         rb720 = findViewById(R.id.rb720)
 
+        // Botão INICIAR
         btnStream.setOnClickListener {
-            // Em vez de iniciar direto, abrimos o pedido de gravar tela
             val mgr = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             startActivityForResult(mgr.createScreenCaptureIntent(), 100)
         }
         
-        // Botão para parar (envia comando para o serviço)
-        val btnStop = Button(this)
-        btnStop.text = "PARAR E FECHAR"
+        // Botão PARAR (Agora sem erro de ClassCastException)
         btnStop.setOnClickListener {
             val intent = Intent(this, StreamService::class.java)
             intent.action = "STOP"
             startService(intent)
+            Toast.makeText(this, "Live Encerrada", Toast.LENGTH_SHORT).show()
         }
-        (findViewById<LinearLayout>(0) ?: window.decorView.findViewById(android.R.id.content) as LinearLayout).addView(btnStop)
     }
 
     override fun onActivityResult(req: Int, res: Int, data: Intent?) {
@@ -59,7 +59,6 @@ class MainActivity : AppCompatActivity() {
             val height = if (rb720.isChecked) 720 else 1080
             val bitrate = if (rb720.isChecked) 2500 * 1024 else 4500 * 1024
             
-            // Inicia o SERVIÇO passando os dados da permissão de tela
             val intent = Intent(this, StreamService::class.java)
             intent.putExtra("code", res)
             intent.putExtra("data", data)
@@ -74,9 +73,8 @@ class MainActivity : AppCompatActivity() {
                 startService(intent)
             }
             
-            Toast.makeText(this, "Iniciando serviço de live...", Toast.LENGTH_LONG).show()
-            // Pode minimizar o app agora
-            moveTaskToBack(true)
+            Toast.makeText(this, "Live Iniciada em Background!", Toast.LENGTH_LONG).show()
+            moveTaskToBack(true) // Minimiza o app automaticamente
         }
     }
 }
