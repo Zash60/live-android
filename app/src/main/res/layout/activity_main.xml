@@ -6,14 +6,61 @@
     android:padding="20dp"
     android:gravity="center">
 
-    <EditText android:id="@+id/etUrl" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="rtmp://a.rtmp.youtube.com/live2" />
-    <EditText android:id="@+id/etKey" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Chave da Live (Stream Key)" />
+    <EditText 
+        android:id="@+id/etUrl" 
+        android:layout_width="match_parent" 
+        android:layout_height="wrap_content" 
+        android:text="rtmp://a.rtmp.youtube.com/live2"
+        android:hint="URL RTMP" />
+
+    <EditText 
+        android:id="@+id/etKey" 
+        android:layout_width="match_parent" 
+        android:layout_height="wrap_content" 
+        android:hint="Chave da Live (Stream Key)" />
     
-    <TextView android:text="Qualidade:" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-    <RadioGroup android:id="@+id/rgQuality" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center">
-        <RadioButton android:id="@+id/rb720" android:text="720p" android:checked="true" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-        <RadioButton android:id="@+id/rb1080" android:text="1080p" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+    <TextView 
+        android:text="Qualidade:" 
+        android:layout_width="wrap_content" 
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"/>
+
+    <RadioGroup 
+        android:id="@+id/rgQuality" 
+        android:layout_width="match_parent" 
+        android:layout_height="wrap_content" 
+        android:orientation="horizontal" 
+        android:gravity="center">
+        
+        <RadioButton 
+            android:id="@+id/rb720" 
+            android:text="720p" 
+            android:checked="true" 
+            android:layout_width="wrap_content" 
+            android:layout_height="wrap_content"/>
+            
+        <RadioButton 
+            android:id="@+id/rb1080" 
+            android:text="1080p" 
+            android:layout_width="wrap_content" 
+            android:layout_height="wrap_content"/>
     </RadioGroup>
 
-    <Button android:id="@+id/btnStream" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="INICIAR LIVE" android:layout_marginTop="20dp"/>
+    <Button 
+        android:id="@+id/btnStream" 
+        android:layout_width="match_parent" 
+        android:layout_height="wrap_content" 
+        android:text="INICIAR LIVE" 
+        android:layout_marginTop="20dp"/>
+
+    <!-- Botão de Parar adicionado aqui para evitar erro de código -->
+    <Button 
+        android:id="@+id/btnStop" 
+        android:layout_width="match_parent" 
+        android:layout_height="wrap_content" 
+        android:text="PARAR E FECHAR" 
+        android:backgroundTint="#FF0000"
+        android:textColor="#FFFFFF"
+        android:layout_marginTop="10dp"/>
+
 </LinearLayout>
