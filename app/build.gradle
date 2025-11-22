@@ -34,6 +34,7 @@ dependencies {
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.11.0'
-    // AQUI ESTÁ A MUDANÇA PARA 2.6.6
-    implementation 'com.github.pedroSG94.rtmp-rtsp-stream-client-java:rtplibrary:2.6.6'
+    
+    // CORREÇÃO: Nome novo da biblioteca (RootEncoder)
+    implementation 'com.github.pedroSG94.RootEncoder:library:2.6.6'
 }
