@@ -9,12 +9,12 @@ import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 
-// IMPORTS CORRETOS PARA VERSÃO 2.6.6
-import com.pedro.rtplibrary.rtmp.RtmpDisplay
-import net.ossrs.rtmp.ConnectCheckerRtmp
+// IMPORTS DO ROOTENCODER
+import com.pedro.library.rtmp.RtmpDisplay
+import com.pedro.common.ConnectChecker
 
-class MainActivity : AppCompatActivity(), ConnectCheckerRtmp {
-    
+class MainActivity : AppCompatActivity(), ConnectChecker {
+
     private lateinit var rtmpDisplay: RtmpDisplay
     private lateinit var btnStream: Button
     private lateinit var etUrl: EditText
@@ -24,16 +24,15 @@ class MainActivity : AppCompatActivity(), ConnectCheckerRtmp {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        
-        // Pede permissão de áudio
+
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 1)
 
         etUrl = findViewById(R.id.etUrl)
         etKey = findViewById(R.id.etKey)
         btnStream = findViewById(R.id.btnStream)
         rb720 = findViewById(R.id.rb720)
-        
-        // Inicializa a biblioteca
+
+        // Inicializa usando a estrutura nova
         rtmpDisplay = RtmpDisplay(baseContext, true, this)
 
         btnStream.setOnClickListener {
@@ -41,7 +40,6 @@ class MainActivity : AppCompatActivity(), ConnectCheckerRtmp {
                 rtmpDisplay.stopStream()
                 btnStream.text = "INICIAR LIVE"
             } else {
-                // Inicia o pedido para gravar a tela
                 val mgr = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                 startActivityForResult(mgr.createScreenCaptureIntent(), 100)
             }
@@ -56,27 +54,25 @@ class MainActivity : AppCompatActivity(), ConnectCheckerRtmp {
             val height = if (rb720.isChecked) 720 else 1080
             val bitrate = if (rb720.isChecked) 2500 * 1024 else 4500 * 1024
             
-            // Configura a intenção de captura
             rtmpDisplay.setIntentResult(res, data)
             
-            // Prepara e inicia (Resolução, FPS, Bitrate, Rotação, DPI)
+            // Na versao 2.6.6: width, height, fps, bitrate, rotation, dpi
             if (rtmpDisplay.prepareAudio() && rtmpDisplay.prepareVideo(width, height, 30, bitrate, 0, 320)) {
-                val fullUrl = "${etUrl.text}/${etKey.text}"
-                rtmpDisplay.startStream(fullUrl)
+                rtmpDisplay.startStream("${etUrl.text}/${etKey.text}")
                 btnStream.text = "PARAR LIVE"
             } else {
-                Toast.makeText(this, "Erro: Resolução inválida para este celular", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Erro: Resolução não suportada", Toast.LENGTH_SHORT).show()
             }
         }
     }
-    
-    // --- CALLBACKS OBRIGATÓRIOS DA VERSÃO 2.6.6 ---
 
-    override fun onConnectionSuccessRtmp() {
+    // --- CALLBACKS DO ROOTENCODER (SEM Sufixo Rtmp) ---
+
+    override fun onConnectionSuccess() {
         runOnUiThread { Toast.makeText(this, "Conectado!", Toast.LENGTH_SHORT).show() }
     }
 
-    override fun onConnectionFailedRtmp(reason: String) {
+    override fun onConnectionFailed(reason: String) {
         runOnUiThread {
             rtmpDisplay.stopStream()
             btnStream.text = "INICIAR LIVE"
@@ -84,18 +80,23 @@ class MainActivity : AppCompatActivity(), ConnectCheckerRtmp {
         }
     }
 
-    override fun onDisconnectRtmp() {
-        runOnUiThread { 
-            btnStream.text = "INICIAR LIVE" 
+    override fun onDisconnect() {
+        runOnUiThread {
+            btnStream.text = "INICIAR LIVE"
             Toast.makeText(this, "Desconectado", Toast.LENGTH_SHORT).show()
         }
     }
 
-    override fun onAuthErrorRtmp() {
-        runOnUiThread { Toast.makeText(this, "Erro de Chave/Auth", Toast.LENGTH_SHORT).show() }
+    override fun onAuthError() {
+        runOnUiThread { Toast.makeText(this, "Erro de Autenticação", Toast.LENGTH_SHORT).show() }
     }
 
-    override fun onAuthSuccessRtmp() {
+    override fun onAuthSuccess() {
         runOnUiThread { Toast.makeText(this, "Autenticado", Toast.LENGTH_SHORT).show() }
+    }
+    
+    // Necessário na nova versão
+    override fun onNewBitrate(bitrate: Long) {
+        
     }
 }
