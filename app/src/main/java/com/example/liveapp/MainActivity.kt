@@ -13,10 +13,11 @@ import androidx.core.app.ActivityCompat
 class MainActivity : AppCompatActivity() {
 
     private lateinit var btnStream: Button
-    private lateinit var btnStop: Button // Novo botão
+    private lateinit var btnStop: Button
     private lateinit var etUrl: EditText
     private lateinit var etKey: EditText
     private lateinit var rb720: RadioButton
+    private lateinit var swInternalAudio: Switch // NOVO
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,20 +30,25 @@ class MainActivity : AppCompatActivity() {
         }
         ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 1)
 
-        // Vincular componentes da tela
+        // Vincular componentes
         etUrl = findViewById(R.id.etUrl)
         etKey = findViewById(R.id.etKey)
         btnStream = findViewById(R.id.btnStream)
         btnStop = findViewById(R.id.btnStop)
         rb720 = findViewById(R.id.rb720)
+        swInternalAudio = findViewById(R.id.swInternalAudio) // NOVO
 
-        // Botão INICIAR
+        // Desabilita switch se Android for antigo (< 10)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            swInternalAudio.isEnabled = false
+            swInternalAudio.text = "Áudio Interno (Indisponível < Android 10)"
+        }
+
         btnStream.setOnClickListener {
             val mgr = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             startActivityForResult(mgr.createScreenCaptureIntent(), 100)
         }
         
-        // Botão PARAR (Agora sem erro de ClassCastException)
         btnStop.setOnClickListener {
             val intent = Intent(this, StreamService::class.java)
             intent.action = "STOP"
@@ -66,6 +72,8 @@ class MainActivity : AppCompatActivity() {
             intent.putExtra("width", width)
             intent.putExtra("height", height)
             intent.putExtra("bitrate", bitrate)
+            // Envia a opção de áudio interno
+            intent.putExtra("internal_audio", swInternalAudio.isChecked)
             
             if (Build.VERSION.SDK_INT >= 26) {
                 startForegroundService(intent)
@@ -74,7 +82,7 @@ class MainActivity : AppCompatActivity() {
             }
             
             Toast.makeText(this, "Live Iniciada em Background!", Toast.LENGTH_LONG).show()
-            moveTaskToBack(true) // Minimiza o app automaticamente
+            moveTaskToBack(true)
         }
     }
 }
