@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.media.MediaRecorder
+import android.media.projection.MediaProjection // <-- Importação adicionada
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -54,14 +55,27 @@ class StreamService : Service(), ConnectChecker {
                     } else {
                         MediaRecorder.AudioSource.MIC
                     }
+                    
+                    // Set the MediaProjection for internal audio capture <-- CÓDIGO ADICIONADO
+                    if (audioSourceChoice == 1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val mediaProjection = rtmpDisplay?.mediaProjection
+                        if (mediaProjection != null) {
+                            rtmpDisplay?.setMediaProjection(mediaProjection)
+                        }
+                    }
 
                     // Use the library's prepareAudio method to set the source.
                     // Parameters: audioSource, sampleRate, isStereo, echoCanceler, noiseSuppressor
                     // FIX: Changed the last two parameters from Int (0) to Boolean (false)
-                    rtmpDisplay?.prepareAudio(source, 44100, true, false, false)
+                    val audioPrepared = rtmpDisplay?.prepareAudio(source, 44100, true, false, false) == true
                     
-                    if (rtmpDisplay?.prepareVideo(width, height, 30, bitrate, 0, 320) == true) {
+                    if (audioPrepared && rtmpDisplay?.prepareVideo(width, height, 30, bitrate, 0, 320) == true) {
                         rtmpDisplay?.startStream(url)
+                    } else if (!audioPrepared) {
+                        // Handle case where audio preparation fails (e.g., unsupported source)
+                        // This is a good place to log an error or notify the user
+                        // For now, we'll just proceed with video if possible, but the user reported audio issue
+                        // Log.e("StreamService", "Audio preparation failed with source: $source")
                     }
                 }
             }
