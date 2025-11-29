@@ -96,7 +96,8 @@ class StreamService : Service(), ConnectChecker {
     
     private fun prepareMicAudio(): Boolean {
         return try {
-            rtmpDisplay?.prepareAudio(44100, true, 128000) == true
+            // CORRIGIDO: Ordem dos parâmetros (Bitrate, SampleRate, IsStereo)
+            rtmpDisplay?.prepareAudio(128000, 44100, true) == true
         } catch (e: Exception) {
             Log.e(TAG, "Erro preparar mic: ${e.message}")
             false
@@ -114,7 +115,8 @@ class StreamService : Service(), ConnectChecker {
                 return false
             }
             
-            // Criar configuração de captura de áudio do sistema
+            // A configuração abaixo é necessária para indicar ao sistema a intenção de captura,
+            // embora a biblioteca RootEncoder faça a gestão do áudio internamente.
             val config = AudioPlaybackCaptureConfiguration.Builder(mediaProjection!!)
                 .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
                 .addMatchingUsage(AudioAttributes.USAGE_GAME)
@@ -123,9 +125,8 @@ class StreamService : Service(), ConnectChecker {
             
             Log.d(TAG, "AudioPlaybackCaptureConfiguration criada com sucesso")
             
-            // Preparar áudio com configuração padrão
-            // A biblioteca RootEncoder usa o MediaProjection internamente
-            rtmpDisplay?.prepareAudio(44100, true, 128000) == true
+            // CORRIGIDO: Ordem dos parâmetros (Bitrate, SampleRate, IsStereo)
+            rtmpDisplay?.prepareAudio(128000, 44100, true) == true
             
         } catch (e: SecurityException) {
             Log.e(TAG, "SecurityException áudio interno: ${e.message}")
