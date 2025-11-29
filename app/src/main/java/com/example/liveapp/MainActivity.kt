@@ -13,21 +13,17 @@ import androidx.core.app.ActivityCompat
 class MainActivity : AppCompatActivity() {
 
     private lateinit var btnStream: Button
-    private lateinit var btnStop: Button
+    private lateinit var btnStop: Button // Novo botão
     private lateinit var etUrl: EditText
     private lateinit var etKey: EditText
     private lateinit var rb720: RadioButton
-    private lateinit var rgAudioSource: RadioGroup
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         // Permissões
-        val permissions = mutableListOf(
-            Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.INTERNET
-        )
+        val permissions = mutableListOf(Manifest.permission.RECORD_AUDIO)
         if (Build.VERSION.SDK_INT >= 33) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -39,13 +35,14 @@ class MainActivity : AppCompatActivity() {
         btnStream = findViewById(R.id.btnStream)
         btnStop = findViewById(R.id.btnStop)
         rb720 = findViewById(R.id.rb720)
-        rgAudioSource = findViewById(R.id.rgAudioSource)
 
+        // Botão INICIAR
         btnStream.setOnClickListener {
             val mgr = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             startActivityForResult(mgr.createScreenCaptureIntent(), 100)
         }
         
+        // Botão PARAR (Agora sem erro de ClassCastException)
         btnStop.setOnClickListener {
             val intent = Intent(this, StreamService::class.java)
             intent.action = "STOP"
@@ -62,18 +59,6 @@ class MainActivity : AppCompatActivity() {
             val height = if (rb720.isChecked) 720 else 1080
             val bitrate = if (rb720.isChecked) 2500 * 1024 else 4500 * 1024
             
-            // Verifica se usuário selecionou áudio interno
-            val useInternalAudio = rgAudioSource.checkedRadioButtonId == R.id.rbInternal
-            
-            // Aviso se selecionou áudio interno em Android < 10
-            if (useInternalAudio && Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                Toast.makeText(
-                    this, 
-                    "Áudio interno requer Android 10+. Usando microfone.", 
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-            
             val intent = Intent(this, StreamService::class.java)
             intent.putExtra("code", res)
             intent.putExtra("data", data)
@@ -81,7 +66,6 @@ class MainActivity : AppCompatActivity() {
             intent.putExtra("width", width)
             intent.putExtra("height", height)
             intent.putExtra("bitrate", bitrate)
-            intent.putExtra("useInternalAudio", useInternalAudio)
             
             if (Build.VERSION.SDK_INT >= 26) {
                 startForegroundService(intent)
@@ -90,7 +74,7 @@ class MainActivity : AppCompatActivity() {
             }
             
             Toast.makeText(this, "Live Iniciada em Background!", Toast.LENGTH_LONG).show()
-            moveTaskToBack(true)
+            moveTaskToBack(true) // Minimiza o app automaticamente
         }
     }
 }
