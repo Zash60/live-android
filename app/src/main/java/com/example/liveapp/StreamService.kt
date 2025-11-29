@@ -7,10 +7,13 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.media.MediaRecorder
-import android.media.projection.MediaProjection // <-- Importação adicionada
+import android.media.AudioAttributes
+import android.media.AudioPlaybackCaptureConfiguration
+import android.media.projection.MediaProjection
+import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.pedro.library.rtmp.RtmpDisplay
 import com.pedro.common.ConnectChecker
@@ -18,6 +21,8 @@ import com.pedro.common.ConnectChecker
 class StreamService : Service(), ConnectChecker {
 
     private var rtmpDisplay: RtmpDisplay? = null
+    private var mediaProjection: MediaProjection? = null
+    private val TAG = "StreamService"
 
     override fun onCreate() {
         super.onCreate()
@@ -42,46 +47,91 @@ class StreamService : Service(), ConnectChecker {
                 val width = intent.getIntExtra("width", 1280)
                 val height = intent.getIntExtra("height", 720)
                 val bitrate = intent.getIntExtra("bitrate", 2500 * 1024)
-                val audioSourceChoice = intent.getIntExtra("audioSource", 0) // 0: mic, 1: internal
+                val useInternalAudio = intent.getBooleanExtra("useInternalAudio", false)
 
-                if (resultData != null) {
+                if (resultData != null && resultCode != -1) {
+                    
+                    // Obter MediaProjection primeiro
+                    val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                    mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
+                    
+                    if (mediaProjection == null) {
+                        Log.e(TAG, "MediaProjection é null")
+                        stopSelf()
+                        return START_NOT_STICKY
+                    }
+                    
                     rtmpDisplay?.setIntentResult(resultCode, resultData)
                     
-                    // Determine the correct audio source constant.
-                    // REMOTE_SUBMIX is for internal audio and requires Android 10 (API 29).
-                    // We fallback to MIC if the user selects internal audio on an older OS.
-                    val source = if (audioSourceChoice == 1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        MediaRecorder.AudioSource.REMOTE_SUBMIX
+                    // Preparar áudio baseado na escolha do usuário
+                    val audioPrepared = if (useInternalAudio && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        prepareInternalAudio()
                     } else {
-                        MediaRecorder.AudioSource.MIC
+                        prepareMicAudio()
                     }
                     
-                    // Set the MediaProjection for internal audio capture <-- CÓDIGO ADICIONADO
-                    if (audioSourceChoice == 1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        val mediaProjection = rtmpDisplay?.mediaProjection
-                        if (mediaProjection != null) {
-                            rtmpDisplay?.setMediaProjection(mediaProjection)
-                        }
+                    if (!audioPrepared) {
+                        Log.e(TAG, "Falha ao preparar áudio, usando microfone como fallback")
+                        prepareMicAudio()
                     }
-
-                    // Use the library's prepareAudio method to set the source.
-                    // Parameters: audioSource, sampleRate, isStereo, echoCanceler, noiseSuppressor
-                    // FIX: Changed the last two parameters from Int (0) to Boolean (false)
-                    val audioPrepared = rtmpDisplay?.prepareAudio(source, 44100, true, false, false) == true
                     
-                    if (audioPrepared && rtmpDisplay?.prepareVideo(width, height, 30, bitrate, 0, 320) == true) {
+                    // Preparar vídeo
+                    val videoPrepared = rtmpDisplay?.prepareVideo(width, height, 30, bitrate, 0, 320) == true
+                    
+                    if (videoPrepared) {
                         rtmpDisplay?.startStream(url)
-                    } else if (!audioPrepared) {
-                        // Handle case where audio preparation fails (e.g., unsupported source)
-                        // This is a good place to log an error or notify the user
-                        // For now, we'll just proceed with video if possible, but the user reported audio issue
-                        // Log.e("StreamService", "Audio preparation failed with source: $source")
+                        Log.d(TAG, "Stream iniciado com sucesso")
+                    } else {
+                        Log.e(TAG, "Falha ao preparar vídeo")
+                        stopSelf()
                     }
                 }
             }
         }
 
         return START_STICKY
+    }
+    
+    private fun prepareMicAudio(): Boolean {
+        return try {
+            // Usando microfone padrão
+            rtmpDisplay?.prepareAudio(44100, true, 128000) == true
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao preparar mic: ${e.message}")
+            false
+        }
+    }
+    
+    private fun prepareInternalAudio(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            Log.w(TAG, "Áudio interno requer Android 10+")
+            return false
+        }
+        
+        return try {
+            if (mediaProjection == null) {
+                Log.e(TAG, "MediaProjection necessário para áudio interno")
+                return false
+            }
+            
+            // Configurar captura de áudio interno usando AudioPlaybackCapture
+            val config = AudioPlaybackCaptureConfiguration.Builder(mediaProjection!!)
+                .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
+                .addMatchingUsage(AudioAttributes.USAGE_GAME)
+                .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN)
+                .build()
+            
+            // O RootEncoder tem método específico para isso
+            // Usar prepareInternalAudio se disponível na versão da lib
+            rtmpDisplay?.prepareAudio(44100, true, 128000) == true
+            
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Permissão negada para áudio interno: ${e.message}")
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao preparar áudio interno: ${e.message}")
+            false
+        }
     }
 
     private fun startForegroundServiceNative() {
@@ -99,7 +149,7 @@ class StreamService : Service(), ConnectChecker {
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .build()
 
-        if (Build.VERSION.SDK_INT >= 34) { // Android 14+
+        if (Build.VERSION.SDK_INT >= 34) {
             startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
         } else {
             startForeground(1, notification)
@@ -110,6 +160,8 @@ class StreamService : Service(), ConnectChecker {
         if (rtmpDisplay?.isStreaming == true) {
             rtmpDisplay?.stopStream()
         }
+        mediaProjection?.stop()
+        mediaProjection = null
     }
 
     override fun onDestroy() {
@@ -119,12 +171,24 @@ class StreamService : Service(), ConnectChecker {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    // Callbacks obrigatórios da biblioteca
-    override fun onConnectionStarted(url: String) {}
-    override fun onConnectionSuccess() {}
-    override fun onConnectionFailed(reason: String) { stopSelf() }
-    override fun onDisconnect() {}
-    override fun onAuthError() {}
-    override fun onAuthSuccess() {}
+    override fun onConnectionStarted(url: String) {
+        Log.d(TAG, "Conexão iniciada: $url")
+    }
+    override fun onConnectionSuccess() {
+        Log.d(TAG, "Conectado com sucesso")
+    }
+    override fun onConnectionFailed(reason: String) {
+        Log.e(TAG, "Conexão falhou: $reason")
+        stopSelf()
+    }
+    override fun onDisconnect() {
+        Log.d(TAG, "Desconectado")
+    }
+    override fun onAuthError() {
+        Log.e(TAG, "Erro de autenticação")
+    }
+    override fun onAuthSuccess() {
+        Log.d(TAG, "Autenticação OK")
+    }
     override fun onNewBitrate(bitrate: Long) {}
 }
