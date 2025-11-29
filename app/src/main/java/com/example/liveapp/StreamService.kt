@@ -7,7 +7,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.media.MediaRecorder
+import android.media.MediaRecorder // Adicionado para referência
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -16,14 +16,18 @@ import com.pedro.common.ConnectChecker
 
 class StreamService : Service(), ConnectChecker {
 
-    // Usamos nossa classe customizada em vez de RtmpDisplay direto
-    private var rtmpDisplay: CustomRtmpDisplay? = null
+    // RtmpDisplay agora é usado diretamente
+    private var rtmpDisplay: RtmpDisplay? = null
+
+    // Valor da constante MediaRecorder.AudioSource.PLAYBACK_CAPTURE (10)
+    private val PLAYBACK_CAPTURE_SOURCE = 10 
 
     override fun onCreate() {
         super.onCreate()
+        // Cria a notificação obrigatória
         startForegroundServiceNative()
-        // Inicializa nossa classe customizada
-        rtmpDisplay = CustomRtmpDisplay(baseContext, true, this)
+        // Inicializa a biblioteca no contexto do Serviço
+        rtmpDisplay = RtmpDisplay(baseContext, true, this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -35,6 +39,7 @@ class StreamService : Service(), ConnectChecker {
             return START_NOT_STICKY
         }
 
+        // Se recebeu os dados da Activity, começa a live
         if (intent != null && rtmpDisplay != null) {
             if (!rtmpDisplay!!.isStreaming) {
                 val resultCode = intent.getIntExtra("code", -1)
@@ -43,18 +48,20 @@ class StreamService : Service(), ConnectChecker {
                 val width = intent.getIntExtra("width", 1280)
                 val height = intent.getIntExtra("height", 720)
                 val bitrate = intent.getIntExtra("bitrate", 2500 * 1024)
+                // NOVO: Recebe a opção de áudio
                 val useInternalAudio = intent.getBooleanExtra("internal_audio", false)
+
 
                 if (resultData != null) {
                     rtmpDisplay?.setIntentResult(resultCode, resultData)
                     
-                    // CONFIGURAÇÃO DE ÁUDIO INTERNO
+                    // CONFIGURAÇÃO DA FONTE DE ÁUDIO
                     if (useInternalAudio && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        // Define a fonte como PLAYBACK_CAPTURE (Áudio Interno)
-                        rtmpDisplay?.setAudioSource(MediaRecorder.AudioSource.PLAYBACK_CAPTURE)
+                        // Se for Android 10+ e a opção foi marcada, usa Áudio Interno (Source 10)
+                        rtmpDisplay?.microphoneManager?.setAudioSource(PLAYBACK_CAPTURE_SOURCE)
                     } else {
-                        // Padrão Microfone
-                        rtmpDisplay?.setAudioSource(MediaRecorder.AudioSource.MIC)
+                        // Caso contrário, ou se for Android < 10, usa o Microfone Padrão
+                        rtmpDisplay?.microphoneManager?.setAudioSource(MediaRecorder.AudioSource.MIC)
                     }
 
                     if (rtmpDisplay?.prepareAudio() == true && 
@@ -79,11 +86,11 @@ class StreamService : Service(), ConnectChecker {
 
         val notification = NotificationCompat.Builder(this, channelId)
             .setContentTitle("Live em Andamento")
-            .setContentText("Capturando tela e áudio...")
+            .setContentText("Capturando tela...")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .build()
 
-        if (Build.VERSION.SDK_INT >= 34) {
+        if (Build.VERSION.SDK_INT >= 34) { // Android 14+
             startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
         } else {
             startForeground(1, notification)
@@ -103,6 +110,7 @@ class StreamService : Service(), ConnectChecker {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    // Callbacks obrigatórios da biblioteca
     override fun onConnectionStarted(url: String) {}
     override fun onConnectionSuccess() {}
     override fun onConnectionFailed(reason: String) { stopSelf() }
@@ -110,17 +118,4 @@ class StreamService : Service(), ConnectChecker {
     override fun onAuthError() {}
     override fun onAuthSuccess() {}
     override fun onNewBitrate(bitrate: Long) {}
-
-    /**
-     * Classe auxiliar para acessar a propriedade 'audioRecorder' que é protegida na biblioteca.
-     * Isso permite mudar a fonte de áudio sem reescrever a lib inteira.
-     */
-    class CustomRtmpDisplay(context: Context, useOpengl: Boolean, connectChecker: ConnectChecker) 
-        : RtmpDisplay(context, useOpengl, connectChecker) {
-        
-        fun setAudioSource(source: Int) {
-            // Acessa a propriedade 'audioRecorder' da classe pai (DisplayBase/RtmpDisplay)
-            this.audioRecorder.audioSource = source
-        }
-    }
 }
