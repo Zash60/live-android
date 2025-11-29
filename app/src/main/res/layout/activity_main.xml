@@ -19,6 +19,13 @@
         android:layout_height="wrap_content" 
         android:hint="Chave da Live (Stream Key)" />
     
+    <Switch
+        android:id="@+id/swInternalAudio"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Gravar Áudio Interno (Android 10+)"
+        android:layout_marginTop="15dp"/>
+    
     <TextView 
         android:text="Qualidade:" 
         android:layout_width="wrap_content" 
@@ -53,7 +60,6 @@
         android:text="INICIAR LIVE" 
         android:layout_marginTop="20dp"/>
 
-    <!-- Botão de Parar adicionado aqui para evitar erro de código -->
     <Button 
         android:id="@+id/btnStop" 
         android:layout_width="match_parent" 
