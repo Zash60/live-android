@@ -27,7 +27,6 @@ android {
     }
     kotlinOptions {
         jvmTarget = '1.8'
-        // AQUI ESTÁ A MÁGICA PARA CONSERTAR O ERRO:
         freeCompilerArgs += ["-Xskip-metadata-version-check"]
     }
 }
