@@ -24,7 +24,10 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         // Permissões
-        val permissions = mutableListOf(Manifest.permission.RECORD_AUDIO)
+        val permissions = mutableListOf(
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.INTERNET
+        )
         if (Build.VERSION.SDK_INT >= 33) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -59,8 +62,17 @@ class MainActivity : AppCompatActivity() {
             val height = if (rb720.isChecked) 720 else 1080
             val bitrate = if (rb720.isChecked) 2500 * 1024 else 4500 * 1024
             
-            // Get selected audio source: 0 for Mic, 1 for Internal
-            val audioSource = if (rgAudioSource.checkedRadioButtonId == R.id.rbInternal) 1 else 0
+            // Verifica se usuário selecionou áudio interno
+            val useInternalAudio = rgAudioSource.checkedRadioButtonId == R.id.rbInternal
+            
+            // Aviso se selecionou áudio interno em Android < 10
+            if (useInternalAudio && Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                Toast.makeText(
+                    this, 
+                    "Áudio interno requer Android 10+. Usando microfone.", 
+                    Toast.LENGTH_LONG
+                ).show()
+            }
             
             val intent = Intent(this, StreamService::class.java)
             intent.putExtra("code", res)
@@ -69,7 +81,7 @@ class MainActivity : AppCompatActivity() {
             intent.putExtra("width", width)
             intent.putExtra("height", height)
             intent.putExtra("bitrate", bitrate)
-            intent.putExtra("audioSource", audioSource)
+            intent.putExtra("useInternalAudio", useInternalAudio)
             
             if (Build.VERSION.SDK_INT >= 26) {
                 startForegroundService(intent)
