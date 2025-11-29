@@ -7,6 +7,9 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -16,6 +19,9 @@ import com.pedro.common.ConnectChecker
 class StreamService : Service(), ConnectChecker {
 
     private var rtmpDisplay: RtmpDisplay? = null
+    private var internalAudioRecord: AudioRecord? = null
+    private var audioThread: Thread? = null
+    private var isStreaming = false
 
     override fun onCreate() {
         super.onCreate()
@@ -43,18 +49,108 @@ class StreamService : Service(), ConnectChecker {
                 val width = intent.getIntExtra("width", 1280)
                 val height = intent.getIntExtra("height", 720)
                 val bitrate = intent.getIntExtra("bitrate", 2500 * 1024)
+                val audioSource = intent.getIntExtra("audioSource", 0) // 0: mic, 1: internal, 2: both
 
                 if (resultData != null) {
                     rtmpDisplay?.setIntentResult(resultCode, resultData)
-                    if (rtmpDisplay?.prepareAudio() == true && 
-                        rtmpDisplay?.prepareVideo(width, height, 30, bitrate, 0, 320) == true) {
+                    
+                    // Prepare audio based on selected source
+                    when (audioSource) {
+                        0 -> { // Microphone only
+                            rtmpDisplay?.prepareAudio()
+                        }
+                        1 -> { // Internal audio only
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                // Use internal audio capture for Android 10+
+                                prepareInternalAudio()
+                            } else {
+                                // Fallback to microphone for older versions
+                                rtmpDisplay?.prepareAudio()
+                            }
+                        }
+                        2 -> { // Both microphone and internal audio
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                prepareInternalAudio()
+                                // Also prepare microphone if the library supports it
+                                rtmpDisplay?.prepareAudio()
+                            } else {
+                                // Fallback to microphone for older versions
+                                rtmpDisplay?.prepareAudio()
+                            }
+                        }
+                    }
+                    
+                    if (rtmpDisplay?.prepareVideo(width, height, 30, bitrate, 0, 320) == true) {
                         rtmpDisplay?.startStream(url)
+                        isStreaming = true
+                        
+                        // Start internal audio thread if needed
+                        if (audioSource == 1 || (audioSource == 2 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)) {
+                            startInternalAudioThread()
+                        }
                     }
                 }
             }
         }
 
         return START_STICKY
+    }
+
+    private fun prepareInternalAudio() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val sampleRate = 44100
+                val channelConfig = AudioFormat.CHANNEL_IN_STEREO
+                val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+                val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+                
+                // Use MediaRecorder.AudioSource.REMOTE_SUBMIX for internal audio
+                internalAudioRecord = AudioRecord(
+                    MediaRecorder.AudioSource.REMOTE_SUBMIX,
+                    sampleRate,
+                    channelConfig,
+                    audioFormat,
+                    bufferSize
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun startInternalAudioThread() {
+        internalAudioRecord?.let { audioRecord ->
+            if (audioRecord.state != AudioRecord.STATE_INITIALIZED) {
+                return
+            }
+            
+            audioThread = Thread {
+                try {
+                    audioRecord.startRecording()
+                    val buffer = ByteArray(4096)
+                    
+                    while (isStreaming && !Thread.currentThread().isInterrupted) {
+                        val bytesRead = audioRecord.read(buffer, 0, buffer.size)
+                        if (bytesRead > 0) {
+                            // Send the audio data to the RTMP stream
+                            // Note: This depends on the library's API for sending custom audio data
+                            // You might need to use a different method based on the library
+                            rtmpDisplay?.sendAudio(buffer, bytesRead)
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    try {
+                        audioRecord.stop()
+                        audioRecord.release()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+            audioThread?.start()
+        }
     }
 
     private fun startForegroundServiceNative() {
@@ -81,6 +177,30 @@ class StreamService : Service(), ConnectChecker {
     }
 
     private fun stopStream() {
+        isStreaming = false
+        
+        // Stop audio thread
+        audioThread?.interrupt()
+        try {
+            audioThread?.join(1000)
+        } catch (e: InterruptedException) {
+            e.printStackTrace()
+        }
+        
+        // Release audio record
+        internalAudioRecord?.let { audioRecord ->
+            if (audioRecord.state == AudioRecord.STATE_INITIALIZED) {
+                try {
+                    audioRecord.stop()
+                    audioRecord.release()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+        internalAudioRecord = null
+        
+        // Stop RTMP stream
         if (rtmpDisplay?.isStreaming == true) {
             rtmpDisplay?.stopStream()
         }
