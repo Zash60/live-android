@@ -57,7 +57,8 @@ class StreamService : Service(), ConnectChecker {
 
                     // Use the library's prepareAudio method to set the source.
                     // Parameters: audioSource, sampleRate, isStereo, echoCanceler, noiseSuppressor
-                    rtmpDisplay?.prepareAudio(source, 44100, true, 0, 0)
+                    // FIX: Changed the last two parameters from Int (0) to Boolean (false)
+                    rtmpDisplay?.prepareAudio(source, 44100, true, false, false)
                     
                     if (rtmpDisplay?.prepareVideo(width, height, 30, bitrate, 0, 320) == true) {
                         rtmpDisplay?.startStream(url)
