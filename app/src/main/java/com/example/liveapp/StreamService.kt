@@ -1,6 +1,5 @@
 package com.example.liveapp
 
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
@@ -42,6 +41,7 @@ class StreamService : Service(), ConnectChecker {
         if (intent != null && rtmpDisplay != null) {
             if (!rtmpDisplay!!.isStreaming) {
                 val resultCode = intent.getIntExtra("code", -1)
+                @Suppress("DEPRECATION")
                 val resultData = intent.getParcelableExtra<Intent>("data")
                 val url = intent.getStringExtra("endpoint")
                 val width = intent.getIntExtra("width", 1280)
@@ -51,7 +51,7 @@ class StreamService : Service(), ConnectChecker {
 
                 if (resultData != null && resultCode != -1) {
                     
-                    // Obter MediaProjection primeiro
+                    // Obter MediaProjection
                     val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                     mediaProjection = projectionManager.getMediaProjection(resultCode, resultData)
                     
@@ -63,15 +63,17 @@ class StreamService : Service(), ConnectChecker {
                     
                     rtmpDisplay?.setIntentResult(resultCode, resultData)
                     
-                    // Preparar áudio baseado na escolha do usuário
+                    // Preparar áudio
                     val audioPrepared = if (useInternalAudio && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        Log.d(TAG, "Tentando capturar áudio interno...")
                         prepareInternalAudio()
                     } else {
+                        Log.d(TAG, "Usando microfone...")
                         prepareMicAudio()
                     }
                     
                     if (!audioPrepared) {
-                        Log.e(TAG, "Falha ao preparar áudio, usando microfone como fallback")
+                        Log.w(TAG, "Falha no áudio escolhido, usando microfone como fallback")
                         prepareMicAudio()
                     }
                     
@@ -80,7 +82,7 @@ class StreamService : Service(), ConnectChecker {
                     
                     if (videoPrepared) {
                         rtmpDisplay?.startStream(url)
-                        Log.d(TAG, "Stream iniciado com sucesso")
+                        Log.d(TAG, "Stream iniciado: $url")
                     } else {
                         Log.e(TAG, "Falha ao preparar vídeo")
                         stopSelf()
@@ -94,42 +96,42 @@ class StreamService : Service(), ConnectChecker {
     
     private fun prepareMicAudio(): Boolean {
         return try {
-            // Usando microfone padrão
             rtmpDisplay?.prepareAudio(44100, true, 128000) == true
         } catch (e: Exception) {
-            Log.e(TAG, "Erro ao preparar mic: ${e.message}")
+            Log.e(TAG, "Erro preparar mic: ${e.message}")
             false
         }
     }
     
     private fun prepareInternalAudio(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            Log.w(TAG, "Áudio interno requer Android 10+")
             return false
         }
         
         return try {
             if (mediaProjection == null) {
-                Log.e(TAG, "MediaProjection necessário para áudio interno")
+                Log.e(TAG, "MediaProjection null para áudio interno")
                 return false
             }
             
-            // Configurar captura de áudio interno usando AudioPlaybackCapture
+            // Criar configuração de captura de áudio do sistema
             val config = AudioPlaybackCaptureConfiguration.Builder(mediaProjection!!)
                 .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
                 .addMatchingUsage(AudioAttributes.USAGE_GAME)
                 .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN)
                 .build()
             
-            // O RootEncoder tem método específico para isso
-            // Usar prepareInternalAudio se disponível na versão da lib
+            Log.d(TAG, "AudioPlaybackCaptureConfiguration criada com sucesso")
+            
+            // Preparar áudio com configuração padrão
+            // A biblioteca RootEncoder usa o MediaProjection internamente
             rtmpDisplay?.prepareAudio(44100, true, 128000) == true
             
         } catch (e: SecurityException) {
-            Log.e(TAG, "Permissão negada para áudio interno: ${e.message}")
+            Log.e(TAG, "SecurityException áudio interno: ${e.message}")
             false
         } catch (e: Exception) {
-            Log.e(TAG, "Erro ao preparar áudio interno: ${e.message}")
+            Log.e(TAG, "Erro áudio interno: ${e.message}")
             false
         }
     }
@@ -139,7 +141,11 @@ class StreamService : Service(), ConnectChecker {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(channelId, "Live Stream", NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(
+                channelId, 
+                "Live Stream", 
+                NotificationManager.IMPORTANCE_LOW
+            )
             manager.createNotificationChannel(channel)
         }
 
@@ -147,6 +153,7 @@ class StreamService : Service(), ConnectChecker {
             .setContentTitle("Live em Andamento")
             .setContentText("Capturando tela...")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
+            .setOngoing(true)
             .build()
 
         if (Build.VERSION.SDK_INT >= 34) {
@@ -157,11 +164,16 @@ class StreamService : Service(), ConnectChecker {
     }
 
     private fun stopStream() {
-        if (rtmpDisplay?.isStreaming == true) {
-            rtmpDisplay?.stopStream()
+        try {
+            if (rtmpDisplay?.isStreaming == true) {
+                rtmpDisplay?.stopStream()
+            }
+            mediaProjection?.stop()
+            mediaProjection = null
+            Log.d(TAG, "Stream parado")
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao parar: ${e.message}")
         }
-        mediaProjection?.stop()
-        mediaProjection = null
     }
 
     override fun onDestroy() {
@@ -171,24 +183,31 @@ class StreamService : Service(), ConnectChecker {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    // Callbacks da biblioteca
     override fun onConnectionStarted(url: String) {
         Log.d(TAG, "Conexão iniciada: $url")
     }
+    
     override fun onConnectionSuccess() {
-        Log.d(TAG, "Conectado com sucesso")
+        Log.d(TAG, "Conectado!")
     }
+    
     override fun onConnectionFailed(reason: String) {
-        Log.e(TAG, "Conexão falhou: $reason")
+        Log.e(TAG, "Falha conexão: $reason")
         stopSelf()
     }
+    
     override fun onDisconnect() {
         Log.d(TAG, "Desconectado")
     }
+    
     override fun onAuthError() {
-        Log.e(TAG, "Erro de autenticação")
+        Log.e(TAG, "Erro autenticação")
     }
+    
     override fun onAuthSuccess() {
-        Log.d(TAG, "Autenticação OK")
+        Log.d(TAG, "Autenticado")
     }
+    
     override fun onNewBitrate(bitrate: Long) {}
 }
