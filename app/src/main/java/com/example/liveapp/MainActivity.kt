@@ -13,10 +13,11 @@ import androidx.core.app.ActivityCompat
 class MainActivity : AppCompatActivity() {
 
     private lateinit var btnStream: Button
-    private lateinit var btnStop: Button // Novo botão
+    private lateinit var btnStop: Button
     private lateinit var etUrl: EditText
     private lateinit var etKey: EditText
     private lateinit var rb720: RadioButton
+    private lateinit var rgAudioSource: RadioGroup
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,6 +28,10 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= 33) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
+        // Add permission for internal audio capture
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            permissions.add(Manifest.permission.CAPTURE_AUDIO_OUTPUT)
+        }
         ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 1)
 
         // Vincular componentes da tela
@@ -35,6 +40,7 @@ class MainActivity : AppCompatActivity() {
         btnStream = findViewById(R.id.btnStream)
         btnStop = findViewById(R.id.btnStop)
         rb720 = findViewById(R.id.rb720)
+        rgAudioSource = findViewById(R.id.rgAudioSource)
 
         // Botão INICIAR
         btnStream.setOnClickListener {
@@ -42,7 +48,7 @@ class MainActivity : AppCompatActivity() {
             startActivityForResult(mgr.createScreenCaptureIntent(), 100)
         }
         
-        // Botão PARAR (Agora sem erro de ClassCastException)
+        // Botão PARAR
         btnStop.setOnClickListener {
             val intent = Intent(this, StreamService::class.java)
             intent.action = "STOP"
@@ -59,6 +65,14 @@ class MainActivity : AppCompatActivity() {
             val height = if (rb720.isChecked) 720 else 1080
             val bitrate = if (rb720.isChecked) 2500 * 1024 else 4500 * 1024
             
+            // Get selected audio source
+            val audioSource = when (rgAudioSource.checkedRadioButtonId) {
+                R.id.rbMic -> 0 // Microphone only
+                R.id.rbInternal -> 1 // Internal audio only
+                R.id.rbBoth -> 2 // Both microphone and internal audio
+                else -> 0 // Default to microphone
+            }
+            
             val intent = Intent(this, StreamService::class.java)
             intent.putExtra("code", res)
             intent.putExtra("data", data)
@@ -66,6 +80,7 @@ class MainActivity : AppCompatActivity() {
             intent.putExtra("width", width)
             intent.putExtra("height", height)
             intent.putExtra("bitrate", bitrate)
+            intent.putExtra("audioSource", audioSource)
             
             if (Build.VERSION.SDK_INT >= 26) {
                 startForegroundService(intent)
