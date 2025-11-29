@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Add this permission for internal audio capture on Android 10+ -->
+    <uses-permission android:name="android.permission.CAPTURE_AUDIO_OUTPUT" />
 
     <application
         android:label="LiveApp"
@@ -18,7 +20,6 @@
             </intent-filter>
         </activity>
         
-        <!-- AQUI ESTÁ A MUDANÇA IMPORTANTE: O SERVIÇO -->
         <service android:name=".StreamService"
                  android:foregroundServiceType="mediaProjection"
                  android:exported="false" />
