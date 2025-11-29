@@ -46,6 +46,39 @@
             android:layout_height="wrap_content"/>
     </RadioGroup>
 
+    <TextView 
+        android:text="Fonte de Áudio:" 
+        android:layout_width="wrap_content" 
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"/>
+
+    <RadioGroup 
+        android:id="@+id/rgAudioSource" 
+        android:layout_width="match_parent" 
+        android:layout_height="wrap_content" 
+        android:orientation="vertical" 
+        android:gravity="center">
+        
+        <RadioButton 
+            android:id="@+id/rbMic" 
+            android:text="Microfone" 
+            android:checked="true" 
+            android:layout_width="wrap_content" 
+            android:layout_height="wrap_content"/>
+            
+        <RadioButton 
+            android:id="@+id/rbInternal" 
+            android:text="Áudio Interno (Sistema)" 
+            android:layout_width="wrap_content" 
+            android:layout_height="wrap_content"/>
+            
+        <RadioButton 
+            android:id="@+id/rbBoth" 
+            android:text="Microfone + Áudio Interno" 
+            android:layout_width="wrap_content" 
+            android:layout_height="wrap_content"/>
+    </RadioGroup>
+
     <Button 
         android:id="@+id/btnStream" 
         android:layout_width="match_parent" 
@@ -53,7 +86,6 @@
         android:text="INICIAR LIVE" 
         android:layout_marginTop="20dp"/>
 
-    <!-- Botão de Parar adicionado aqui para evitar erro de código -->
     <Button 
         android:id="@+id/btnStop" 
         android:layout_width="match_parent" 
