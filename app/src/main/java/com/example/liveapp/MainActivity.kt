@@ -28,10 +28,6 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= 33) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        // Add permission for internal audio capture
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            permissions.add(Manifest.permission.CAPTURE_AUDIO_OUTPUT)
-        }
         ActivityCompat.requestPermissions(this, permissions.toTypedArray(), 1)
 
         // Vincular componentes da tela
@@ -42,13 +38,11 @@ class MainActivity : AppCompatActivity() {
         rb720 = findViewById(R.id.rb720)
         rgAudioSource = findViewById(R.id.rgAudioSource)
 
-        // Botão INICIAR
         btnStream.setOnClickListener {
             val mgr = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             startActivityForResult(mgr.createScreenCaptureIntent(), 100)
         }
         
-        // Botão PARAR
         btnStop.setOnClickListener {
             val intent = Intent(this, StreamService::class.java)
             intent.action = "STOP"
@@ -65,13 +59,8 @@ class MainActivity : AppCompatActivity() {
             val height = if (rb720.isChecked) 720 else 1080
             val bitrate = if (rb720.isChecked) 2500 * 1024 else 4500 * 1024
             
-            // Get selected audio source
-            val audioSource = when (rgAudioSource.checkedRadioButtonId) {
-                R.id.rbMic -> 0 // Microphone only
-                R.id.rbInternal -> 1 // Internal audio only
-                R.id.rbBoth -> 2 // Both microphone and internal audio
-                else -> 0 // Default to microphone
-            }
+            // Get selected audio source: 0 for Mic, 1 for Internal
+            val audioSource = if (rgAudioSource.checkedRadioButtonId == R.id.rbInternal) 1 else 0
             
             val intent = Intent(this, StreamService::class.java)
             intent.putExtra("code", res)
@@ -89,7 +78,7 @@ class MainActivity : AppCompatActivity() {
             }
             
             Toast.makeText(this, "Live Iniciada em Background!", Toast.LENGTH_LONG).show()
-            moveTaskToBack(true) // Minimiza o app automaticamente
+            moveTaskToBack(true)
         }
     }
 }
